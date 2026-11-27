@@ -169,3 +169,90 @@ class ReplyStoreTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+import sqlite3
+import threading
+import time
+import os
+
+
+def test_stress_concurrent_writes_and_deletes() -> None:
+    """100 عمليات كتابة وحذف متزامنة لا تترك بيانات يتيمة."""
+    store = ReplyStore(":memory:")
+    session = store.open_session()
+    errors: list[Exception] = []
+
+    def writer() -> None:
+        try:
+            for _ in range(50):
+                store.save_reply(session, "late")
+        except Exception as exc:
+            errors.append(exc)
+
+    def deleter() -> None:
+        try:
+            time.sleep(0.01)
+            store.delete_session(session)
+        except Exception as exc:
+            errors.append(exc)
+
+    threads = [threading.Thread(target=writer) for _ in range(2)]
+    threads.append(threading.Thread(target=deleter))
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    assert not errors
+    assert store.replies(session) == []
+    # لا توجد ردود يتيمة في الجدول
+    cursor = store._conn.execute("SELECT COUNT(*) FROM replies")
+    assert cursor.fetchone()[0] == 0
+    store.close()
+
+
+def test_persistence_after_reopen() -> None:
+    """البيانات تبقى متسقة بعد إغلاق وإعادة فتح قاعدة البيانات."""
+    path = "test_persistence.sqlite3"
+    if os.path.exists(path):
+        os.remove(path)
+
+    with ReplyStore(path) as store:
+        session = store.open_session()
+        store.save_reply(session, "hello")
+        store.delete_session(session)
+
+    with ReplyStore(path) as store2:
+        assert store2.replies(session) == []
+        # الجلسة ما زالت موجودة لكنها محذوفة
+        cursor = store2._conn.execute(
+            "SELECT deleted FROM sessions WHERE id = ?", (session,)
+        )
+        row = cursor.fetchone()
+        assert row is not None and row[0] == 1
+
+    os.remove(path)
+
+
+def test_sqlite_busy_timeout() -> None:
+    """معاملة طويلة لا تسبب خطأ SQLITE_BUSY بفضل timeout الافتراضي."""
+    store = ReplyStore(":memory:")
+    session = store.open_session()
+
+    def slow_writer() -> None:
+        with store._conn:
+            store._conn.execute("SELECT 1")
+            time.sleep(0.1)
+            store._conn.execute(
+                "INSERT INTO replies (session_id, body) VALUES (?, ?)",
+                (session, "slow"),
+            )
+
+    t = threading.Thread(target=slow_writer)
+    t.start()
+    time.sleep(0.01)
+    # هذه العملية يجب أن تنتظر ثم تنجح، لا أن تفشل
+    result = store.save_reply(session, "fast")
+    t.join()
+    assert result is True
+    assert "slow" in store.replies(session)
+    store.close()
