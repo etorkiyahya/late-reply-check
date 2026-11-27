@@ -103,3 +103,18 @@ See CONTRIBUTING.md and SECURITY.md.
 ## License
 
 MIT License. See LICENSE.
+## Integration example (FastAPI-like)
+
+```python
+from late_reply_check import ReplyStore
+
+store = ReplyStore("app.sqlite3")
+
+def handle_delete(session_id: str) -> None:
+    store.delete_session(session_id)
+
+def background_worker(session_id: str, reply: str) -> None:
+    if not store.save_reply(session_id, reply):
+        # Session was deleted; drop the reply silently.
+        return
+```
