@@ -1,0 +1,36 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "late-reply-check"
+version = "0.2.0"
+description = "A dependency-free Python/SQLite reference implementation preventing delayed replies from restoring deleted chat sessions."
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.10"
+authors = [{ name = "etorkiyahya" }]
+keywords = ["sqlite", "concurrency", "chat", "session", "reference-implementation"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Topic :: Database",
+]
+
+[project.urls]
+Homepage = "https://github.com/etorkiyahya/late-reply-check"
+Repository = "https://github.com/etorkiyahya/late-reply-check"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
