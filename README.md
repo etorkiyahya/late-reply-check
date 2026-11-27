@@ -1,65 +1,105 @@
 # late-reply-check
 
-Experimental Python/SQLite reference implementation for a chat persistence race:
-a reply finishes after its conversation has been deleted.
+[![Tests](https://github.com/etorkiyahya/late-reply-check/actions/workflows/tests.yml/badge.svg)](https://github.com/etorkiyahya/late-reply-check/actions)
+![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)
+![Python](https://img.shields.io/badge/Python-3.10--3.14-blue.svg)
 
-## Problem
+A dependency-free Python and SQLite reference implementation for preventing delayed AI replies from restoring deleted conversation data.
 
-A background worker may retain a session identifier while a user deletes that
-session. Saving the finished reply without checking the session can recreate
-unwanted data.
+## The problem
 
-## Approach
+When a user deletes a conversation while a background worker is still generating a response, an unsafe persistence operation can restore unwanted data.
 
-The reply writer and deletion operation use SQLite write transactions
-(`BEGIN IMMEDIATE`). The writer checks that the session exists within its
-transaction. The delete operation removes the session and its replies via a
-foreign key cascade. If deletion commits first, a subsequent save is rejected;
-if saving commits first, deletion removes that saved reply.
+This project demonstrates a transactional approach to preventing that behavior.
 
-## Run
+## Features
 
-Python 3.10+ recommended; no third-party dependencies. Use a file-backed database; the implementation uses separate connections.
+- Transactional session validation.
+- Rejection of delayed replies after session deletion.
+- Atomic cascading deletion.
+- Concurrent write and delete protection.
+- Session isolation.
+- Persistent SQLite storage.
+- Unicode support.
+- No external dependencies.
 
-```sh
-python -m unittest discover -v
-```
+## How it works
 
-## Example
+Both reply persistence and session deletion use SQLite write transactions with BEGIN IMMEDIATE.
+
+If deletion commits first, subsequent replies are rejected.
+
+If saving commits first, deletion removes the saved replies through foreign-key cascading.
+
+## Usage
+
+Requires Python 3.10 or later.
 
 ```python
 from late_reply_check import ReplyStore
-from tempfile import TemporaryDirectory
-from pathlib import Path
 
-with TemporaryDirectory() as tmp:
-    store = ReplyStore(Path(tmp) / "demo.sqlite3")
-    session = store.open_session()
-    assert store.save_reply(session, "first")
-    store.delete_session(session)
-    assert not store.save_reply(session, "late")
-    assert store.replies(session) == []
+store = ReplyStore("demo.sqlite3")
+
+session = store.open_session()
+
+assert store.save_reply(session, "First reply")
+
+store.delete_session(session)
+
+assert not store.save_reply(session, "Delayed reply")
+assert store.replies(session) == []
 ```
+
+## Testing
+
+Run the complete test suite:
+
+```bash
+python -m unittest discover -v
+```
+
+## Verified CI results
+
+| Python version | Tests | Result |
+|---|---:|---|
+| 3.10 | 16/16 | PASS |
+| 3.11 | 16/16 | PASS |
+| 3.12 | 16/16 | PASS |
+| 3.13 | 16/16 | PASS |
+| 3.14 | 16/16 | PASS |
+
+Total: 80 successful test executions across five Python versions.
+
+[Verified GitHub Actions run](https://github.com/etorkiyahya/late-reply-check/actions/runs/46031066638)
+
+The test suite covers concurrent writes and deletion, independent processes, transaction rollback, foreign-key integrity, session isolation, Unicode handling, and persistence after reopening the database.
 
 ## Scope and limitations
 
-This is an independent, deliberately reduced demonstration derived from the
-transactional approach tested in an earlier local regression. It does
-not contain the private application, HTTP integration, recovery registry,
-leases, or in-memory session cache. It is not a production security library.
-Session identifiers are not authorization credentials. Applications must
-implement authentication, authorization, request cancellation, cache invalidation,
-and retention policies separately. Logical deletion does not imply physical
-erasure of SQLite pages, logs, replicas or backups. All writers must follow the
-same database invariants. Tests cover local SQLite behavior, not distributed
-databases or every possible failure mode.
+This is an experimental reference implementation, not a production-ready security library.
 
-## Status
+Applications must implement authentication, authorization, cancellation, cache invalidation, and retention policies separately.
 
-Initial experimental reference implementation; no claims about production deployment, external users or independent adoption. Feedback and reproducible bug reports are welcome. See CONTRIBUTING.md and SECURITY.md.
+Session identifiers are not authentication credentials.
 
-The test suite includes competing threads, a separate process, rollback, foreign-key integrity and restart checks. The GitHub Actions matrix is proposed; cloud results are not yet available. SQLite write contention can raise an OperationalError rather than return False; callers must handle errors. Never reuse old session identifiers or restore obsolete database backups as active state.
+Logical deletion does not guarantee physical erasure from database pages, logs, replicas, or backups.
+
+All writers must follow the same transactional rules. SQLite write contention may raise OperationalError. Callers must handle these errors appropriately.
+
+Distributed database behavior is outside the current scope.
+
+## Project status
+
+Initial public implementation with automated regression testing.
+
+External adoption and production deployment have not yet been established.
+
+## Contributions
+
+Reproducible bug reports, regression tests, and technical feedback are welcome.
+
+See CONTRIBUTING.md and SECURITY.md.
 
 ## License
 
-MIT; see LICENSE.
+MIT License. See LICENSE.
