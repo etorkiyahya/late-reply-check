@@ -3,13 +3,15 @@ from __future__ import annotations
 
 import sqlite3
 from pathlib import Path
-from typing import Iterator, Optional
 
 
 class ReplyStore:
     """A SQLite-backed store that rejects replies for deleted sessions using BEGIN IMMEDIATE."""
 
     def __init__(self, path: str | Path) -> None:
+        if str(path) == ":memory:":
+            raise ValueError("In-memory databases are not supported for this reference implementation.")
+        
         self._path = str(path)
         self._conn = sqlite3.connect(self._path)
         self._conn.execute("PRAGMA foreign_keys = ON")
