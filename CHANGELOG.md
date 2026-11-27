@@ -1,3 +1,14 @@
+## [0.2.0] - 2026-11-27
+
+### Added
+- `pyproject.toml` for `pip install -e .` support.
+- `ARCHITECTURE.md` explaining `BEGIN IMMEDIATE` guarantees.
+- `ReplyStore` context manager (`__enter__` / `__exit__`).
+- Explicit `session_id` type validation.
+- Stress, persistence, and `SQLITE_BUSY` regression tests.
+- `ruff` and `mypy` checks in CI.
+
+
 # Changelog
 
 ## 0.1.0 - 2026-11-27
